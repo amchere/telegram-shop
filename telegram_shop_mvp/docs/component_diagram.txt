@@ -1,0 +1,10 @@
+### Component Diagram Description
+
+*   **User (Client)**: Interacts with the Telegram Bot.
+*   **Telegram Bot (aiogram)**: The user-facing interface. Receives user messages, handles commands, displays the catalog, and manages the ordering process. Communicates with the Backend API.
+*   **Backend API (FastAPI)**: The central logic hub. Exposes a REST API. Handles business logic, processes orders, manages user data, and communicates with the PostgreSQL database and external integrations. Authenticates Admin Panel requests.
+*   **PostgreSQL Database**: The primary data store. Contains tables for users, products, product variants, orders, and order items.
+*   **Admin Panel (React)**: A web-based interface for administrators. Allows management of products, orders, and users. Communicates with the Backend API to fetch and modify data. Imports/exports data via the backend.
+*   **Integration Adapters**: Modules within the Backend API responsible for communicating with external services.
+    *   **Google Sheets Adapter**: Reads product catalog data from and writes order data to Google Sheets.
+    *   **Analytics Adapter**: Sends event data (e.g., `add_to_cart`, `purchase`) to Google Analytics and Yandex.Metrika.
