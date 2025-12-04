@@ -1,0 +1,100 @@
+import type { Product, ProductVariant, Order } from '../types';
+
+/**
+ * Format price for display
+ */
+export function formatPrice(price: number): string {
+  return `${price.toFixed(2)} ₽`;
+}
+
+/**
+ * Format product details for display
+ */
+export function formatProduct(product: Product, variant?: ProductVariant): string {
+  let text = `📦 **${product.name}**\n\n`;
+  text += `${product.description}\n\n`;
+  
+  if (variant) {
+    text += `📋 Вариант: ${variant.name}\n`;
+    text += `SKU: ${variant.sku}\n`;
+    const finalPrice = product.price + variant.priceModifier;
+    text += `💰 Цена: ${formatPrice(finalPrice)}\n`;
+    text += `📊 В наличии: ${variant.stockQuantity} шт.\n\n`;
+  } else {
+    text += `SKU: ${product.sku}\n`;
+    text += `💰 Цена: ${formatPrice(product.price)}\n\n`;
+  }
+  
+  if (product.weight) {
+    text += `⚖️ Вес: ${product.weight} г\n`;
+  }
+  
+  if (product.dimensions) {
+    text += `📏 Размеры: ${product.dimensions}\n`;
+  }
+  
+  return text;
+}
+
+/**
+ * Format order summary for display
+ */
+export function formatOrderSummary(order: Partial<Order>): string {
+  let text = `📋 **Ваш заказ**\n\n`;
+  
+  if (order.items && order.items.length > 0) {
+    order.items.forEach((item, index) => {
+      text += `${index + 1}. Товар #${item.productId}`;
+      if (item.variantId) {
+        text += ` (вариант #${item.variantId})`;
+      }
+      text += `\n   Количество: ${item.quantity} шт.\n`;
+      text += `   Цена: ${formatPrice(item.subtotal)}\n\n`;
+    });
+  }
+  
+  if (order.totalAmount) {
+    text += `💰 **Итого: ${formatPrice(order.totalAmount)}**\n\n`;
+  }
+  
+  if (order.shippingAddress) {
+    text += `📍 Адрес доставки: ${order.shippingAddress}\n\n`;
+  }
+  
+  if (order.notes) {
+    text += `📝 Примечания: ${order.notes}\n\n`;
+  }
+  
+  return text;
+}
+
+/**
+ * Format order status for display
+ */
+export function formatOrderStatus(status: string): string {
+  const statusMap: Record<string, string> = {
+    pending: '⏳ Ожидает подтверждения',
+    confirmed: '✅ Подтвержден',
+    processing: '📦 В обработке',
+    shipped: '🚚 Отправлен',
+    delivered: '✨ Доставлен',
+    cancelled: '❌ Отменен',
+  };
+  
+  return statusMap[status] || status;
+}
+
+/**
+ * Truncate text to specified length
+ */
+export function truncate(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength - 3) + '...';
+}
+
+/**
+ * Escape markdown special characters
+ */
+export function escapeMarkdown(text: string): string {
+  return text.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
+}
