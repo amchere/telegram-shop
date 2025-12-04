@@ -1,0 +1,1221 @@
+openapi: 3.0.3
+info:
+  title: Telegram Store MVP API
+  description: |
+    REST API для Telegram-магазина, обеспечивающий функциональность электронной коммерции.
+    
+    ## Основные возможности
+    - Управление каталогом продуктов с вариантами
+    - Обработка заказов
+    - Аутентификация администраторов через JWT
+    - Импорт/экспорт данных (CSV, XLSX, Google Sheets)
+    - Интеграция с аналитикой (GA4, Yandex Metrika)
+    
+    ## Аутентификация
+    Защищенные endpoints требуют JWT токен в заголовке:
+    ```
+    Authorization: Bearer <access_token>
+    ```
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@telegram-shop.example
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.telegram-shop.example/api/v1
+    description: Production server
+  - url: http://localhost:8000/api/v1
+    description: Development server
+
+tags:
+  - name: Authentication
+    description: Аутентификация и управление токенами
+  - name: Products
+    description: Публичные endpoints для каталога продуктов
+  - name: Orders
+    description: Создание и управление заказами
+  - name: Admin - Products
+    description: Административное управление продуктами
+  - name: Admin - Orders
+    description: Административное управление заказами
+  - name: Admin - Users
+    description: Управление пользователями
+  - name: Admin - Import/Export
+    description: Импорт и экспорт данных
+
+paths:
+  # ==================== AUTHENTICATION ====================
+  /auth/token:
+    post:
+      tags:
+        - Authentication
+      summary: Получить JWT токены
+      description: Аутентификация администратора и получение access/refresh токенов
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  example: admin
+                password:
+                  type: string
+                  format: password
+                  example: SecurePassword123!
+      responses:
+        '200':
+          description: Успешная аутентификация
+          headers:
+            Set-Cookie:
+              description: HttpOnly cookie с refresh token
+              schema:
+                type: string
+                example: refresh_token=eyJhbGc...; HttpOnly; Secure; SameSite=Strict; Max-Age=604800
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Неверные учетные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Incorrect username or password
+
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Обновить access token
+      description: Получить новый access token используя refresh token из cookie
+      operationId: refreshToken
+      responses:
+        '200':
+          description: Новый access token выдан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Невалидный или истекший refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==================== PUBLIC PRODUCTS ====================
+  /products:
+    get:
+      tags:
+        - Products
+      summary: Получить список продуктов
+      description: Возвращает пагинированный список активных продуктов с возможностью фильтрации по категории
+      operationId: getProducts
+      parameters:
+        - name: category_id
+          in: query
+          description: ID категории для фильтрации
+          required: false
+          schema:
+            type: integer
+            example: 1
+        - name: page
+          in: query
+          description: Номер страницы
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+            example: 1
+        - name: size
+          in: query
+          description: Количество элементов на странице
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+            example: 10
+      responses:
+        '200':
+          description: Список продуктов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductListResponse'
+
+  /products/{product_id}:
+    get:
+      tags:
+        - Products
+      summary: Получить детали продукта
+      description: Возвращает полную информацию о продукте, включая варианты и опции
+      operationId: getProductById
+      parameters:
+        - name: product_id
+          in: path
+          required: true
+          description: ID продукта
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: Детали продукта
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDetail'
+        '404':
+          description: Продукт не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /categories:
+    get:
+      tags:
+        - Products
+      summary: Получить список категорий
+      description: Возвращает все категории продуктов с иерархической структурой
+      operationId: getCategories
+      responses:
+        '200':
+          description: Список категорий
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+
+  # ==================== ORDERS ====================
+  /orders:
+    post:
+      tags:
+        - Orders
+      summary: Создать заказ
+      description: Создает новый заказ на основе корзины пользователя
+      operationId: createOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '201':
+          description: Заказ успешно создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400':
+          description: Ошибка валидации (товар отсутствует на складе и т.д.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: Product variant 101 is out of stock
+        '422':
+          description: Невалидные данные запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+  # ==================== ADMIN - ORDERS ====================
+  /admin/orders:
+    get:
+      tags:
+        - Admin - Orders
+      summary: Получить список всех заказов
+      description: Возвращает пагинированный список заказов с возможностью фильтрации
+      operationId: getAdminOrders
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          description: Фильтр по статусу заказа
+          required: false
+          schema:
+            type: string
+            enum: [pending, processing, shipped, delivered, cancelled]
+            example: pending
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Список заказов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminOrderListResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /admin/orders/{order_id}:
+    get:
+      tags:
+        - Admin - Orders
+      summary: Получить детали заказа
+      description: Возвращает полную информацию о заказе
+      operationId: getAdminOrderById
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            example: 56
+      responses:
+        '200':
+          description: Детали заказа
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminOrderDetail'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Заказ не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags:
+        - Admin - Orders
+      summary: Обновить статус заказа
+      description: Изменяет статус заказа (отправка уведомления пользователю)
+      operationId: updateOrderStatus
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            example: 56
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: [pending, processing, shipped, delivered, cancelled]
+                  example: shipped
+      responses:
+        '200':
+          description: Статус обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminOrderDetail'
+        '400':
+          description: Невалидный переход статуса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Заказ не найден
+
+  # ==================== ADMIN - PRODUCTS ====================
+  /admin/products:
+    get:
+      tags:
+        - Admin - Products
+      summary: Получить все продукты (включая неактивные)
+      description: Административный endpoint для управления каталогом
+      operationId: getAdminProducts
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Список продуктов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductListResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+    post:
+      tags:
+        - Admin - Products
+      summary: Создать новый продукт
+      description: Создает продукт с вариантами
+      operationId: createProduct
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProductRequest'
+      responses:
+        '201':
+          description: Продукт создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDetail'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+  /admin/products/{product_id}:
+    put:
+      tags:
+        - Admin - Products
+      summary: Обновить продукт
+      description: Полное обновление продукта и его вариантов
+      operationId: updateProduct
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: product_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProductRequest'
+      responses:
+        '200':
+          description: Продукт обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDetail'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Продукт не найден
+        '422':
+          description: Ошибка валидации
+
+    delete:
+      tags:
+        - Admin - Products
+      summary: Удалить продукт
+      description: Удаляет продукт и все его варианты
+      operationId: deleteProduct
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: product_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Продукт удален
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Продукт не найден
+
+  # ==================== ADMIN - USERS ====================
+  /admin/users:
+    get:
+      tags:
+        - Admin - Users
+      summary: Получить список пользователей
+      description: Возвращает список клиентов, разместивших заказы
+      operationId: getUsers
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Список пользователей
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  size:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /admin/users/{user_id}:
+    get:
+      tags:
+        - Admin - Users
+      summary: Получить детали пользователя
+      operationId: getUserById
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Детали пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetail'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          description: Пользователь не найден
+
+  # ==================== ADMIN - IMPORT/EXPORT ====================
+  /admin/import/csv:
+    post:
+      tags:
+        - Admin - Import/Export
+      summary: Импорт продуктов из CSV
+      description: Загружает и обрабатывает CSV файл с продуктами
+      operationId: importCSV
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: CSV файл с продуктами
+      responses:
+        '202':
+          description: Импорт запущен (обрабатывается в фоне)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task_id:
+                    type: string
+                    example: "task_abc123"
+                  message:
+                    type: string
+                    example: "Import started. Check status at /admin/tasks/task_abc123"
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '400':
+          description: Невалидный файл
+
+  /admin/import/xlsx:
+    post:
+      tags:
+        - Admin - Import/Export
+      summary: Импорт продуктов из XLSX
+      operationId: importXLSX
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '202':
+          description: Импорт запущен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task_id:
+                    type: string
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /admin/import/google-sheets:
+    post:
+      tags:
+        - Admin - Import/Export
+      summary: Импорт из Google Sheets
+      description: Импортирует продукты из указанной Google таблицы
+      operationId: importGoogleSheets
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - spreadsheet_url
+              properties:
+                spreadsheet_url:
+                  type: string
+                  format: uri
+                  example: "https://docs.google.com/spreadsheets/d/1ABC.../edit"
+                sheet_name:
+                  type: string
+                  example: "Products"
+                  default: "Sheet1"
+      responses:
+        '202':
+          description: Импорт запущен
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '400':
+          description: Невалидный URL или нет доступа к таблице
+
+  /admin/export/csv:
+    get:
+      tags:
+        - Admin - Import/Export
+      summary: Экспорт заказов в CSV
+      operationId: exportOrdersCSV
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+            example: "2025-11-01"
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+            example: "2025-11-30"
+      responses:
+        '200':
+          description: CSV файл
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /admin/export/xlsx:
+    get:
+      tags:
+        - Admin - Import/Export
+      summary: Экспорт заказов в XLSX
+      operationId: exportOrdersXLSX
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: XLSX файл
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /admin/export/google-sheets:
+    post:
+      tags:
+        - Admin - Import/Export
+      summary: Экспорт заказов в Google Sheets
+      operationId: exportToGoogleSheets
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                start_date:
+                  type: string
+                  format: date
+                end_date:
+                  type: string
+                  format: date
+                spreadsheet_url:
+                  type: string
+                  format: uri
+                  description: URL существующей таблицы (опционально, создаст новую если не указан)
+      responses:
+        '200':
+          description: Экспорт завершен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  spreadsheet_url:
+                    type: string
+                    example: "https://docs.google.com/spreadsheets/d/1XYZ.../edit"
+                  message:
+                    type: string
+                    example: "Orders exported successfully"
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+# ==================== COMPONENTS ====================
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT access token полученный через /auth/token
+
+  responses:
+    UnauthorizedError:
+      description: Access token отсутствует или невалиден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: Not authenticated
+
+  schemas:
+    # ========== AUTH SCHEMAS ==========
+    TokenResponse:
+      type: object
+      required:
+        - access_token
+        - token_type
+      properties:
+        access_token:
+          type: string
+          description: JWT access token
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        token_type:
+          type: string
+          example: "bearer"
+
+    # ========== PRODUCT SCHEMAS ==========
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Clothing"
+        parent_id:
+          type: integer
+          nullable: true
+          example: null
+
+    ProductListItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Classic T-Shirt"
+        description:
+          type: string
+          example: "A comfortable 100% cotton t-shirt"
+        category_id:
+          type: integer
+          example: 1
+        is_active:
+          type: boolean
+          example: true
+        price_range:
+          type: object
+          properties:
+            min:
+              type: number
+              format: decimal
+              example: 19.99
+            max:
+              type: number
+              format: decimal
+              example: 21.99
+
+    ProductListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductListItem'
+        total:
+          type: integer
+          example: 1
+        page:
+          type: integer
+          example: 1
+        size:
+          type: integer
+          example: 10
+
+    OptionType:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "Color"
+        values:
+          type: array
+          items:
+            type: string
+          example: ["Red", "Blue"]
+
+    VariantAttribute:
+      type: object
+      properties:
+        type:
+          type: string
+          example: "Color"
+        value:
+          type: string
+          example: "Red"
+
+    ProductVariant:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 101
+        sku:
+          type: string
+          example: "TS-RED-M"
+        price:
+          type: number
+          format: decimal
+          example: 19.99
+        stock_quantity:
+          type: integer
+          example: 50
+        attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/VariantAttribute'
+
+    ProductDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Classic T-Shirt"
+        description:
+          type: string
+          example: "A comfortable 100% cotton t-shirt"
+        category_id:
+          type: integer
+          example: 1
+        is_active:
+          type: boolean
+          example: true
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/OptionType'
+        variants:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductVariant'
+
+    CreateProductRequest:
+      type: object
+      required:
+        - name
+        - description
+        - category_id
+        - variants
+      properties:
+        name:
+          type: string
+          example: "New Product"
+        description:
+          type: string
+          example: "Product description"
+        category_id:
+          type: integer
+          example: 1
+        is_active:
+          type: boolean
+          default: true
+        variants:
+          type: array
+          items:
+            type: object
+            required:
+              - sku
+              - price
+              - stock_quantity
+            properties:
+              sku:
+                type: string
+                example: "NP-001"
+              price:
+                type: number
+                format: decimal
+                example: 29.99
+              stock_quantity:
+                type: integer
+                example: 100
+              attributes:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VariantAttribute'
+
+    UpdateProductRequest:
+      allOf:
+        - $ref: '#/components/schemas/CreateProductRequest'
+
+    # ========== ORDER SCHEMAS ==========
+    OrderItem:
+      type: object
+      required:
+        - variant_id
+        - quantity
+      properties:
+        variant_id:
+          type: integer
+          example: 101
+        quantity:
+          type: integer
+          minimum: 1
+          example: 2
+
+    CreateOrderRequest:
+      type: object
+      required:
+        - user_id
+        - user_details
+        - shipping_address
+        - items
+      properties:
+        user_id:
+          type: integer
+          format: int64
+          description: Telegram User ID
+          example: 123456789
+        user_details:
+          type: object
+          required:
+            - full_name
+            - phone_number
+          properties:
+            full_name:
+              type: string
+              example: "John Doe"
+            phone_number:
+              type: string
+              example: "+15551234567"
+        shipping_address:
+          type: string
+          example: "123 Main St, Anytown, USA"
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/OrderItem'
+
+    OrderItemResponse:
+      type: object
+      properties:
+        product_name:
+          type: string
+          example: "Classic T-Shirt (Red, M)"
+        quantity:
+          type: integer
+          example: 2
+        price:
+          type: number
+          format: decimal
+          example: 19.99
+
+    OrderResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 56
+        status:
+          type: string
+          enum: [pending, processing, shipped, delivered, cancelled]
+          example: "pending"
+        total_amount:
+          type: number
+          format: decimal
+          example: 61.97
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItemResponse'
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-11-30T10:00:00Z"
+
+    AdminOrderListItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 56
+        user_id:
+          type: integer
+          format: int64
+          example: 123456789
+        status:
+          type: string
+          example: "pending"
+        total_amount:
+          type: number
+          format: decimal
+          example: 61.97
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-11-30T10:00:00Z"
+
+    AdminOrderListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminOrderListItem'
+        total:
+          type: integer
+          example: 1
+        page:
+          type: integer
+          example: 1
+        size:
+          type: integer
+          example: 20
+
+    AdminOrderItemDetail:
+      type: object
+      properties:
+        variant_id:
+          type: integer
+          example: 101
+        sku:
+          type: string
+          example: "TS-RED-M"
+        product_name:
+          type: string
+          example: "Classic T-Shirt"
+        quantity:
+          type: integer
+          example: 2
+        price_at_purchase:
+          type: number
+          format: decimal
+          example: 19.99
+
+    AdminOrderDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 56
+        user_id:
+          type: integer
+          format: int64
+          example: 123456789
+        status:
+          type: string
+          example: "pending"
+        total_amount:
+          type: number
+          format: decimal
+          example: 61.97
+        shipping_address:
+          type: string
+          example: "123 Main St, Anytown, USA"
+        customer_contact:
+          type: string
+          example: "John Doe, +15551234567"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminOrderItemDetail'
+
+    # ========== USER SCHEMAS ==========
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 123456789
+        full_name:
+          type: string
+          example: "John Doe"
+        username:
+          type: string
+          nullable: true
+          example: "johndoe"
+        phone_number:
+          type: string
+          nullable: true
+          example: "+15551234567"
+        created_at:
+          type: string
+          format: date-time
+
+    UserDetail:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            orders_count:
+              type: integer
+              example: 5
+            total_spent:
+              type: number
+              format: decimal
+              example: 299.95
+
+    # ========== ERROR SCHEMAS ==========
+    ErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+          example: "Error message"
+
+    ValidationError:
+      type: object
+      properties:
+        detail:
+          type: array
+          items:
+            type: object
+            properties:
+              loc:
+                type: array
+                items:
+                  type: string
+                example: ["body", "items", 0, "quantity"]
+              msg:
+                type: string
+                example: "ensure this value is greater than 0"
+              type:
+                type: string
+                example: "value_error.number.not_gt"
