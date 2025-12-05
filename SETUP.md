@@ -675,6 +675,12 @@ pm2 logs telegram-shop-bot
 
 ## ✅ Проверка работы
 
+# Установить jq
+```bash   
+sudo apt update
+sudo apt install jq -y
+```
+
 ### Checklist
 
 - [ ] API доступен на порту 3000
