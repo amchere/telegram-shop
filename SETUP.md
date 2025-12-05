@@ -581,7 +581,80 @@ curl -X POST http://localhost:3000/api/auth/token \
   }
 }
 ```
+### 2.1 Если нет пользователя 
 
+```bash
+Всё ясно: таблица admin_users пустая, поэтому логин admin/admin123 и не работает — просто нет ни одного админа.
+
+Нужно создать администратора. Для этого надо знать, как API хэширует пароли (bcrypt, argon2 и т.п.), но в 99% таких шаблонов — это bcrypt.
+
+Сделаем так:
+
+На хосте сгенерируем bcrypt‑хэш для пароля admin123.
+Вставим запись в admin_users с этим хэшем.
+1. Сгенерировать bcrypt‑хэш пароля admin123
+Самый простой способ — через node в контейнере api:
+
+bash
+Copy
+docker exec -it telegram_shop_api sh -c "node -e \"const bcrypt = require('bcrypt'); bcrypt.hash('admin123', 10).then(h => console.log(h));\""
+Эта команда выведет строку типа:
+
+text
+Copy
+$2b$10$Q3l3.... (длинный bcrypt-хэш)
+Скопируй этот хэш целиком.
+
+Если команда упадёт с ошибкой Cannot find module 'bcrypt', пришли ошибку — подскажу обходной вариант (через npx bcrypt-cli или встроенную утилиту).
+
+2. Вставить админа в admin_users
+Вернись в psql:
+
+bash
+Copy
+docker exec -it telegram_shop_db psql -U postgres -d telegram_shop
+И выполни (подставь свой хэш вместо <ХЭШ_ОТСЮДА>):
+
+sql
+Copy
+INSERT INTO admin_users (username, email, password_hash, role, is_active)
+VALUES ('admin', 'admin@example.com', '<ХЭШ_ОТСЮДА>', 'admin', true);
+Проверим:
+
+sql
+Copy
+SELECT id, username, email, role, is_active, created_at
+FROM admin_users;
+Должна появиться строка с admin.
+
+3. Проверить логин ещё раз
+С хоста:
+
+bash
+Copy
+curl -X POST http://localhost:3001/api/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "admin",
+    "password": "admin123"
+  }'
+Если всё ок, получишь что‑то вроде:
+
+json
+Copy
+{
+  "access_token": "....",
+  "expires_in": ...
+}
+Если вернётся снова Incorrect username or password, скинь:
+
+Ответ целиком curl .../auth/token.
+Логи API:
+bash
+Copy
+docker-compose logs --tail=100 api
+
+```
 ### 3. Проверка Telegram бота
 
 1. Откройте Telegram
