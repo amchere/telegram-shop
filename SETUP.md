@@ -706,34 +706,6 @@ curl -X POST http://localhost:3001/api/admin/products \
     ]
   }'
 
-# или вариация
-
-curl -X POST http://localhost:3001/api/admin/products \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Гриль",
-    "description": "гриль угольный weber compact",
-    "category_id": 1,
-    "is_active": true,
-    "variants": [
-      {
-        "sku": "GRILL-WEBER-BLACK",
-        "price": 15000,
-        "stock_quantity": 5,
-        "images": [],
-        "option_values": [1]
-      },
-      {
-        "sku": "GRILL-WEBER-RED",
-        "price": 16000,
-        "stock_quantity": 3,
-        "images": [],
-        "option_values": [2]
-      }
-    ]
-  }'
-
 # 4. Получить заказы
 curl -H "Authorization: Bearer $TOKEN" \
   http://localhost:3001/api/admin/orders
