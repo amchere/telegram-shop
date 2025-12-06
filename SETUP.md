@@ -392,6 +392,11 @@ YANDEX_METRIKA_ID=12345678
 ### Шаг 4: Запуск с Docker Compose
 
 ```bash
+#для слабых машин < RAM 2G
+sudo sysctl vm.swappiness=80
+```
+
+```bash
 # Запуск
 docker-compose up -d
 
