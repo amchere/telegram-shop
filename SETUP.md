@@ -320,6 +320,11 @@ swapon --show
 free -h
 ```
 
+Чтобы swap включался после перезагрузки:
+```bash
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+
 ```bash
 # Установка Docker
 curl -fsSL https://get.docker.com -o get-docker.sh
