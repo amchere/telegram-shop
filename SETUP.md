@@ -400,6 +400,10 @@ sudo sysctl vm.swappiness=80
 # Запуск
 docker-compose up -d
 
+# Добавляем учетку admin
+docker exec -it telegram_shop_api sh -c "yarn prisma db seed"
+
+
 # Проверка
 docker-compose ps
 docker-compose logs -f api
