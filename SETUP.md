@@ -424,33 +424,36 @@ sudo nano /etc/nginx/sites-available/telegram-shop
 **Содержимое конфига:**
 
 ```nginx
-server {
-    listen 80;
-    server_name your-domain.com www.your-domain.com;
-
-    # Redirect to HTTPS (после установки SSL)
-    # return 301 https://$server_name$request_uri;
-
-    location /api {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
+    server {
+        listen 80;
+        server_name <ВСТАВИТЬ IP>;
+    
+        location /api {
+            proxy_pass http://localhost:3001;  # API контейнер проброшен на 3001
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection 'upgrade';
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_cache_bypass $http_upgrade;
+        }
+    
+        location /api-docs {
+            proxy_pass http://localhost:3001/api-docs;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection 'upgrade';
+            proxy_set_header Host $host;
+        }
+    
+        # корень, чтобы не было пустой страницы
+        location / {
+            return 200 'OK';
+            add_header Content-Type text/plain;
+        }
     }
-
-    location /api-docs {
-        proxy_pass http://localhost:3000/api-docs;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-    }
-}
 ```
 
 ```bash
@@ -466,69 +469,6 @@ sudo systemctl restart nginx
 # Включить автозапуск
 sudo systemctl enable nginx
 ```
-
-```bash
-о логу nginx видно:
-
-text
-Copy
-"GET /:3001/api/products HTTP/1.1" 404 ...
-"GET / HTTP/1.1" 200 ...
-Ты сейчас в браузере открывал не http://195.58.54.37/api/products, а что‑то вроде http://195.58.54.37:3001/api/products или /:3001/api/products – nginx это видит как путь /:3001/api/products, а не как порт.
-
-Через nginx тебе нужно ходить ТОЛЬКО на порт 80 (без :3001), а путь – /api/....
-
-Как правильно обращаться
-В браузере / Postman / curl снаружи сервера:
-bash
-Copy
-http://195.58.54.37/api/products
-Внутри nginx мы уже проксируем на localhost:3001.
-Давай проверим конфиг nginx
-Покажи, что у тебя сейчас в конфиге:
-
-bash
-Copy
-sudo cat /etc/nginx/sites-available/telegram-shop
-А пока можешь просто создать/поправить его вот так:
-
-nginx
-Copy
-server {
-    listen 80;
-    server_name 195.58.54.37;
-
-    location /api {
-        proxy_pass http://localhost:3001;  # API контейнер проброшен на 3001
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-    }
-
-    location /api-docs {
-        proxy_pass http://localhost:3001/api-docs;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-    }
-
-    # корень, чтобы не было пустой страницы
-    location / {
-        return 200 'OK';
-        add_header Content-Type text/plain;
-    }
-}
-Команды:
-
-bash
-Copy
-sudo nano /etc/nginx/sites-available/telegram-shop   # вставляешь конфиг выше
 
 # включаем сайт
 sudo ln -s /etc/nginx/sites-available/telegram-shop /etc/nginx/sites-enabled/telegram-shop 2>/dev/null || true
