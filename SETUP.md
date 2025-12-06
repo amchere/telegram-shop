@@ -528,22 +528,22 @@ sudo systemctl status nginx
 
 ```bash
 # Health check
-curl http://localhost:3000/api
+curl http://localhost:3001/api
 
 # Список товаров
-curl http://localhost:3000/api/products
+curl http://localhost:3001/api/products
 
 # Категории
-curl http://localhost:3000/api/categories
+curl http://localhost:3001/api/categories
 
 # Swagger документация
-# Откройте в браузере: http://localhost:3000/api-docs
+# Откройте в браузере: http://localhost:3001/api-docs
 ```
 
 ### 2. Получение JWT токена для админки
 
 ```bash
-curl -X POST http://localhost:3000/api/auth/token \
+curl -X POST http://localhost:3001/api/auth/token \
   -H "Content-Type: application/json" \
   -d '{
     "username": "admin",
@@ -665,7 +665,7 @@ sudo apt install jq -y
 
 ### Checklist
 
-- [ ] API доступен на порту 3000
+- [ ] API доступен на порту 3001
 - [ ] Swagger документация открывается
 - [ ] PostgreSQL запущен и доступен
 - [ ] Telegram бот отвечает на `/start`
@@ -678,17 +678,17 @@ sudo apt install jq -y
 
 ```bash
 # 1. Получить токен
-TOKEN=$(curl -s -X POST http://localhost:3000/api/auth/token \
+TOKEN=$(curl -s -X POST http://localhost:3001/api/auth/token \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin123"}' \
   | jq -r '.access_token')
 
 # 2. Получить все товары (admin)
 curl -H "Authorization: Bearer $TOKEN" \
-  http://localhost:3000/api/admin/products
+  http://localhost:3001/api/admin/products
 
 # 3. Создать новый товар
-curl -X POST http://localhost:3000/api/admin/products \
+curl -X POST http://localhost:3001/api/admin/products \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -700,7 +700,7 @@ curl -X POST http://localhost:3000/api/admin/products \
 
 # 4. Получить заказы
 curl -H "Authorization: Bearer $TOKEN" \
-  http://localhost:3000/api/admin/orders
+  http://localhost:3001/api/admin/orders
 ```
 ## исправление в создании товара
 ```bash
