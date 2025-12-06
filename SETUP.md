@@ -423,7 +423,7 @@ sudo nano /etc/nginx/sites-available/telegram-shop
 
 **Содержимое конфига:**
 
-```nginx
+```bash
     server {
         listen 80;
         server_name <ВСТАВИТЬ IP>;
@@ -469,7 +469,7 @@ sudo systemctl restart nginx
 # Включить автозапуск
 sudo systemctl enable nginx
 ```
-
+```bash
 # включаем сайт
 sudo ln -s /etc/nginx/sites-available/telegram-shop /etc/nginx/sites-enabled/telegram-shop 2>/dev/null || true
 
