@@ -710,54 +710,6 @@ curl -X POST http://localhost:3001/api/admin/products \
 curl -H "Authorization: Bearer $TOKEN" \
   http://localhost:3001/api/admin/orders
 ```
-## исправление в создании товара
-```bash
-1. Создаём категорию в БД
-bash
-Copy
-docker exec -it telegram_shop_db psql -U postgres -d telegram_shop
-Внутри psql:
-
-sql
-Copy
-INSERT INTO categories (name, parent_id)
-VALUES ('Default Category', NULL);
-
-SELECT id, name FROM categories ORDER BY id;
-Запомни id (скорее всего будет 1).
-
-Выйти:
-
-sql
-Copy
-\q
-2. Создаём товар через API с этим category_id
-Подставь реальный ID категории:
-
-bash
-Copy
-CATEGORY_ID=1  # если в SELECT выше другой id — поставь его
-
-curl -X POST http://localhost:3001/api/admin/products \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"name\": \"Test Product\",
-    \"description\": \"This is a test product\",
-    \"category_id\": $CATEGORY_ID,
-    \"is_active\": true,
-    \"variants\": [
-      {
-        \"sku\": \"TEST-001\",
-        \"price\": 1000,
-        \"stock_quantity\": 10,
-        \"attributes\": [],
-        \"images\": []
-      }
-    ]
-  }"
-Если всё ок — вернётся JSON созданного продукта.
-```
 ---
 
 ## 🛑 Остановка и управление
