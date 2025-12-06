@@ -293,6 +293,33 @@ pm2 delete telegram-shop-api
 # Обновление системы
 sudo apt update && sudo apt upgrade -y
 
+#Проверить, сколько у сервера памяти и свапа
+На сервере:
+```bash
+Copy
+free -h
+swapon --show
+```
+С большой вероятностью у тебя:
+1 ГБ или 2 ГБ RAM;
+и нет/мало swap.
+Сборка Nest/TypeScript с yarn build + Docker buildx легко вылезает за 1–2 ГБ.
+Добавить swap (рекомендую минимум 2 ГБ)
+Если swap отсутствует (swapon --show ничего не выводит), создай:
+
+```bash
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+```
+Проверка:
+
+```bash
+swapon --show
+free -h
+```
+
 # Установка Docker
 curl -fsSL https://get.docker.com -o get-docker.sh
 sudo sh get-docker.sh
